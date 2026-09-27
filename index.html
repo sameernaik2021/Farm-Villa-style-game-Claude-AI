@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wheatgrove Farm</title>
+<style>
+:root{
+  --grass:#72B84A; --grass-dark:#5da33c; --sky:#bfe6f7; --wood:#a96f3b; --soil:#8b5a35;
+  --gold:#f5c84b; --ui-green:#3f8f45; --card:#fffdf6; --ink:#2c3a22; --line:#d8ceb3;
+  padding-top: env(safe-area-inset-top,0px); padding-bottom: env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:linear-gradient(#bfe6f7,#e9f7e1);color:#2c3a22;}
+h1,h2,h3{margin:0;font-family:'Georgia',serif;}
+#app{max-width:960px;margin:0 auto;padding:10px 14px 30px;}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;}
+.brand{display:flex;align-items:center;gap:8px;}
+.brand h1{font-size:1.4rem;color:#3f6b2a;}
+.stats{display:flex;gap:8px;flex-wrap:wrap;}
+.chip{background:#fffdf6;border:2px solid #e3dcc4;border-radius:20px;padding:5px 12px;font-weight:600;font-size:.9rem;display:flex;align-items:center;gap:5px;box-shadow:0 2px 0 #e3dcc4;}
+#lvl-wrap{width:100%;background:#fffdf6;border:2px solid #e3dcc4;border-radius:14px;padding:8px 12px;margin:6px 0 10px;}
+#xp-bar-bg{background:#eee8d5;border-radius:8px;height:12px;overflow:hidden;margin-top:4px;}
+#xp-bar{background:linear-gradient(90deg,#f5c84b,#f0a93a);height:100%;width:0%;transition:width .4s;}
+.tabs{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap;}
+.tab-btn{background:#eef3e3;border:none;border-radius:10px;padding:8px 14px;font-weight:600;cursor:pointer;color:#3f6b2a;}
+.tab-btn.active{background:var(--ui-green);color:#fff;}
+.panel{display:none;}
+.panel.active{display:block;}
+#farm-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;background:#5da33c;padding:10px;border-radius:16px;border:4px solid #4a8a30;}
+.plot{aspect-ratio:1;background:#8b5a35;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;position:relative;user-select:none;border:2px solid #74472a;}
+.plot.locked{background:repeating-linear-gradient(45deg,#c9c2a3,#c9c2a3 6px,#b9b18f 6px,#b9b18f 12px);cursor:not-allowed;}
+.plot.locked::after{content:'🔒';font-size:1.2rem;}
+.plot .prog{position:absolute;bottom:2px;left:2px;right:2px;height:5px;background:#00000033;border-radius:3px;overflow:hidden;}
+.plot .prog i{display:block;height:100%;background:#ffd94b;}
+.seed-bar,.shop-grid,.orders,.buildings{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.card{background:var(--card);border:2px solid #e3dcc4;border-radius:12px;padding:10px 12px;min-width:150px;flex:1 1 150px;box-shadow:0 2px 0 #e3dcc4;}
+.card h3{font-size:1rem;margin-bottom:4px;}
+.card small{color:#6b7a5c;}
+.card button{margin-top:8px;width:100%;padding:7px;border:none;border-radius:8px;background:var(--ui-green);color:#fff;font-weight:700;cursor:pointer;}
+.card button:disabled{background:#b9c2ad;cursor:not-allowed;}
+.building{background:var(--card);border:2px solid #e3dcc4;border-radius:12px;padding:10px 12px;flex:1 1 200px;}
+.building .row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.building progress{width:100%;height:10px;}
+#inv-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+.inv-chip{background:#fffdf6;border:2px solid #e3dcc4;border-radius:10px;padding:4px 8px;font-size:.85rem;}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#2c3a22;color:#fff;padding:8px 16px;border-radius:20px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:50;}
+#toast.show{opacity:1;}
+.footer-btns{margin-top:16px;display:flex;gap:8px;}
+.footer-btns button{background:#e3dcc4;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:600;}
+@media(max-width:520px){.plot{font-size:1.2rem;} #farm-grid{grid-template-columns:repeat(5,1fr);}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand"><h1>🌾 Wheatgrove Farm</h1></div>
+    <div class="stats">
+      <div class="chip">🪙 <span id="coins">0</span></div>
+      <div class="chip">📦 <span id="storeUsed">0</span>/<span id="storeCap">100</span></div>
+    </div>
+  </header>
+
+  <div id="lvl-wrap">
+    <div style="display:flex;justify-content:space-between;"><strong>Level <span id="lvl">1</span></strong><span id="xp-text">0 / 100 XP</span></div>
+    <div id="xp-bar-bg"><div id="xp-bar"></div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="farm">🌱 Farm</button>
+    <button class="tab-btn" data-tab="buildings">🏭 Buildings</button>
+    <button class="tab-btn" data-tab="orders">📋 Orders</button>
+    <button class="tab-btn" data-tab="shop">🏪 Shop</button>
+  </div>
+
+  <div class="panel active" id="panel-farm">
+    <div id="farm-grid"></div>
+    <h3 style="margin-top:14px;">Plant a seed</h3>
+    <div class="seed-bar" id="seed-bar"></div>
+  </div>
+
+  <div class="panel" id="panel-buildings">
+    <div class="buildings" id="buildings-list"></div>
+  </div>
+
+  <div class="panel" id="panel-orders">
+    <h3>Customer Orders</h3>
+    <div class="orders" id="orders-list"></div>
+  </div>
+
+  <div class="panel" id="panel-shop">
+    <h3>Build & Expand</h3>
+    <div class="shop-grid" id="shop-list"></div>
+  </div>
+
+  <h3 style="margin-top:16px;">Storehouse</h3>
+  <div id="inv-list"></div>
+
+  <div class="footer-btns">
+    <button id="save-btn">💾 Save</button>
+    <button id="reset-btn">♻️ Reset Farm</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ---------- DATA ---------- */
+const CROPS = {
+  wheat:  {name:'Wheat',  icon:'🌾', seedCost:5,  sellPrice:12, growTime:20,  xp:4,  level:1},
+  corn:   {name:'Corn',   icon:'🌽', seedCost:12, sellPrice:28, growTime:45,  xp:8,  level:2},
+  tomato: {name:'Tomato', icon:'🍅', seedCost:20, sellPrice:45, growTime:75,  xp:14, level:4},
+};
+const BUILDING_DEFS = {
+  coop:    {name:'Chicken Coop', icon:'🐔', level:2, cost:150, feed:{wheat:1}, time:25, out:{item:'egg',qty:1}, cap:1},
+  mill:    {name:'Windmill',     icon:'🌀', level:3, cost:300, feed:{wheat:2}, time:20, out:{item:'flour',qty:1}, cap:1},
+  bakery:  {name:'Bakery',       icon:'🥖', level:5, cost:600, feed:{flour:2,egg:1}, time:40, out:{item:'bread',qty:1}, cap:1},
+};
+const ITEM_ICON = {wheat:'🌾',corn:'🌽',tomato:'🍅',egg:'🥚',flour:'🌫️',bread:'🍞'};
+const LAND_UNLOCK_COST = 200;
+const STORE_BASE = 100, STORE_PER_UPGRADE = 50;
+
+/* ---------- STATE ---------- */
+let state = null;
+function freshState(){
+  return {
+    coins: 250, xp: 0, level: 1,
+    storageCap: STORE_BASE,
+    plots: Array.from({length:24}, (_,i)=>({locked: i>=8, crop:null, plantedAt:0, finishAt:0})),
+    inventory: {},
+    buildings: {}, // id -> {level(1), busy:false, startedAt, finishAt}
+    orders: [],
+  };
+}
+function xpNeeded(level){ return 80 + (level-1)*70; }
+function save(){ localStorage.setItem('wheatgrove_save', JSON.stringify(state)); toast('Saved!'); }
+function load(){
+  const raw = localStorage.getItem('wheatgrove_save');
+  state = raw ? JSON.parse(raw) : freshState();
+  if(!state.orders || state.orders.length===0) refreshOrders(false);
+}
+function resetGame(){ if(confirm('Reset your whole farm?')){ state = freshState(); refreshOrders(false); save(); renderAll(); } }
+
+/* ---------- HELPERS ---------- */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 1600);
+}
+function invTotal(){ return Object.values(state.inventory).reduce((a,b)=>a+b,0); }
+function addItem(item, qty){
+  const free = state.storageCap - invTotal();
+  const add = Math.max(0, Math.min(qty, free));
+  state.inventory[item] = (state.inventory[item]||0) + add;
+  if(add < qty) toast('Storehouse full! Some ' + item + ' lost.');
+  return add;
+}
+function removeItems(cost){
+  for(const k in cost) state.inventory[k] = (state.inventory[k]||0) - cost[k];
+}
+function canAfford(cost){
+  for(const k in cost) if((state.inventory[k]||0) < cost[k]) return false;
+  return true;
+}
+function gainXp(amount){
+  state.xp += amount;
+  while(state.xp >= xpNeeded(state.level)){
+    state.xp -= xpNeeded(state.level);
+    state.level++;
+    toast('🎉 Level up! Now level ' + state.level);
+  }
+}
+function fmtTime(sec){
+  sec = Math.max(0,Math.ceil(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return (m>0? m+'m ':'') + s + 's';
+}
+
+/* ---------- FARM GRID ---------- */
+function renderFarm(){
+  const grid = document.getElementById('farm-grid');
+  grid.innerHTML = '';
+  state.plots.forEach((p, idx)=>{
+    const div = document.createElement('div');
+    div.className = 'plot' + (p.locked ? ' locked' : '');
+    if(!p.locked){
+      if(!p.crop){
+        div.textContent = '';
+      } else {
+        const def = CROPS[p.crop];
+        const now = Date.now();
+        const total = p.finishAt - p.plantedAt;
+        const elapsed = now - p.plantedAt;
+        const ready = now >= p.finishAt;
+        div.textContent = ready ? def.icon : (elapsed < total*0.5 ? '🌱' : '🌿');
+        if(!ready){
+          const prog = document.createElement('div'); prog.className='prog';
+          const bar = document.createElement('i'); bar.style.width = Math.min(100, elapsed/total*100)+'%';
+          prog.appendChild(bar); div.appendChild(prog);
+        }
+      }
+      div.onclick = ()=> onPlotClick(idx);
+    } else {
+      div.onclick = ()=> unlockPlot(idx);
+      div.title = 'Unlock for ' + LAND_UNLOCK_COST + ' coins';
+    }
+    grid.appendChild(div);
+  });
+}
+let selectedSeed = 'wheat';
+function renderSeedBar(){
+  const bar = document.getElementById('seed-bar');
+  bar.innerHTML = '';
+  Object.entries(CROPS).forEach(([id,def])=>{
+    const locked = state.level < def.level;
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML = `<h3>${def.icon} ${def.name}</h3><small>Cost ${def.seedCost}🪙 · ${def.growTime}s · +${def.xp}xp</small>`;
+    const btn = document.createElement('button');
+    btn.textContent = locked ? 'Level ' + def.level + ' req.' : (selectedSeed===id ? 'Selected' : 'Select');
+    btn.disabled = locked;
+    btn.onclick = ()=>{ selectedSeed = id; renderSeedBar(); };
+    card.appendChild(btn);
+    bar.appendChild(card);
+  });
+}
+function onPlotClick(idx){
+  const p = state.plots[idx];
+  if(!p.crop){
+    const def = CROPS[selectedSeed];
+    if(state.level < def.level){ toast('Requires level ' + def.level); return; }
+    if(state.coins < def.seedCost){ toast('Not enough coins'); return; }
+    state.coins -= def.seedCost;
+    p.crop = selectedSeed; p.plantedAt = Date.now(); p.finishAt = Date.now() + def.growTime*1000;
+  } else {
+    const def = CROPS[p.crop];
+    if(Date.now() < p.finishAt){ toast('Still growing: ' + fmtTime((p.finishAt-Date.now())/1000)); return; }
+    addItem(p.crop, 2);
+    gainXp(def.xp);
+    p.crop = null;
+  }
+  renderAll();
+}
+function unlockPlot(idx){
+  if(state.coins < LAND_UNLOCK_COST){ toast('Need ' + LAND_UNLOCK_COST + ' coins'); return; }
+  state.coins -= LAND_UNLOCK_COST;
+  state.plots[idx].locked = false;
+  renderAll();
+}
+
+/* ---------- BUILDINGS ---------- */
+function renderBuildings(){
+  const wrap = document.getElementById('buildings-list');
+  wrap.innerHTML = '';
+  const owned = Object.keys(state.buildings);
+  if(owned.length===0){ wrap.innerHTML = '<p>No buildings yet — buy one from the Shop tab.</p>'; return; }
+  owned.forEach(id=>{
+    const def = BUILDING_DEFS[id];
+    const b = state.buildings[id];
+    const div = document.createElement('div'); div.className='building';
+    const feedStr = Object.entries(def.feed).map(([k,v])=>v+' '+ITEM_ICON[k]).join(' + ');
+    let status;
+    if(!b.busy){
+      status = `<button>Produce (${feedStr})</button>`;
+    } else {
+      const now = Date.now();
+      const ready = now >= b.finishAt;
+      const pct = Math.min(100, (now-b.startedAt)/(b.finishAt-b.startedAt)*100);
+      status = ready
+        ? `<button data-collect="1">Collect ${def.out.qty} ${ITEM_ICON[def.out.item]}</button>`
+        : `<progress value="${pct}" max="100"></progress><small>${fmtTime((b.finishAt-now)/1000)} left</small>`;
+    }
+    div.innerHTML = `<h3>${def.icon} ${def.name}</h3><div class="row"><small>Output: ${def.out.qty} ${def.out.item}</small></div><div class="row">${status}</div>`;
+    const btn = div.querySelector('button');
+    if(btn){
+      btn.onclick = ()=>{
+        if(btn.dataset.collect){
+          addItem(def.out.item, def.out.qty);
+          gainXp(6);
+          b.busy = false;
+        } else {
+          if(!canAfford(def.feed)){ toast('Missing ingredients'); return; }
+          removeItems(def.feed);
+          b.busy = true; b.startedAt = Date.now(); b.finishAt = Date.now() + def.time*1000;
+        }
+        renderAll();
+      };
+    }
+    wrap.appendChild(div);
+  });
+}
+
+/* ---------- SHOP ---------- */
+function renderShop(){
+  const wrap = document.getElementById('shop-list');
+  wrap.innerHTML = '';
+  Object.entries(BUILDING_DEFS).forEach(([id,def])=>{
+    const owned = !!state.buildings[id];
+    const locked = state.level < def.level;
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML = `<h3>${def.icon} ${def.name}</h3><small>${locked ? 'Requires level '+def.level : 'Cost: '+def.cost+' 🪙'}</small>`;
+    const btn = document.createElement('button');
+    btn.textContent = owned ? 'Owned' : 'Build';
+    btn.disabled = owned || locked || state.coins < def.cost;
+    btn.onclick = ()=>{
+      state.coins -= def.cost;
+      state.buildings[id] = {busy:false,startedAt:0,finishAt:0};
+      toast('Built ' + def.name + '!');
+      renderAll();
+    };
+    card.appendChild(btn);
+    wrap.appendChild(card);
+  });
+  // storage upgrade
+  const card = document.createElement('div'); card.className='card';
+  const cost = Math.floor(120 * (state.storageCap/STORE_BASE));
+  card.innerHTML = `<h3>📦 Storehouse +${STORE_PER_UPGRADE}</h3><small>Cost: ${cost} 🪙 (cap ${state.storageCap} → ${state.storageCap+STORE_PER_UPGRADE})</small>`;
+  const btn = document.createElement('button'); btn.textContent='Upgrade';
+  btn.disabled = state.coins < cost;
+  btn.onclick = ()=>{ state.coins -= cost; state.storageCap += STORE_PER_UPGRADE; renderAll(); };
+  card.appendChild(btn); wrap.appendChild(card);
+}
+
+/* ---------- ORDERS ---------- */
+const CUSTOMERS = ['👩 Emma','👨 John','👩 Sophia','👦 Max','👵 Grandma Rose'];
+function randomOrder(){
+  const pool = Object.keys(ITEM_ICON);
+  const req = {};
+  const n = 1 + Math.floor(Math.random()*2);
+  for(let i=0;i<n;i++){
+    const item = pool[Math.floor(Math.random()*pool.length)];
+    req[item] = (req[item]||0) + (1 + Math.floor(Math.random()*3));
+  }
+  const value = Object.entries(req).reduce((s,[k,v])=>s+v*8,0);
+  return {who: CUSTOMERS[Math.floor(Math.random()*CUSTOMERS.length)], req, reward: value+20, xp: Math.round(value/3)+10};
+}
+function refreshOrders(cost=true){
+  if(cost && state.coins < 20){ toast('Need 20 coins to refresh'); return; }
+  if(cost) state.coins -= 20;
+  state.orders = [randomOrder(), randomOrder(), randomOrder()];
+  renderAll();
+}
+function renderOrders(){
+  const wrap = document.getElementById('orders-list');
+  wrap.innerHTML = '';
+  state.orders.forEach((o, idx)=>{
+    const card = document.createElement('div'); card.className='card';
+    const reqStr = Object.entries(o.req).map(([k,v])=>v+' '+ITEM_ICON[k]+' '+k).join(', ');
+    card.innerHTML = `<h3>${o.who}</h3><small>Needs: ${reqStr}</small><br><small>Reward: ${o.reward} 🪙 · ${o.xp} xp</small>`;
+    const btn = document.createElement('button'); btn.textContent='Fulfill';
+    btn.disabled = !canAfford(o.req);
+    btn.onclick = ()=>{
+      removeItems(o.req); state.coins += o.reward; gainXp(o.xp);
+      state.orders.splice(idx,1);
+      state.orders.push(randomOrder());
+      toast('Order delivered!');
+      renderAll();
+    };
+    card.appendChild(btn);
+    wrap.appendChild(card);
+  });
+  const refreshBtn = document.createElement('div'); refreshBtn.className='card';
+  refreshBtn.innerHTML = '<h3>🔄 New Orders</h3><small>Cost: 20 🪙</small>';
+  const b = document.createElement('button'); b.textContent='Refresh'; b.onclick = ()=>refreshOrders(true);
+  refreshBtn.appendChild(b); wrap.appendChild(refreshBtn);
+}
+
+/* ---------- INVENTORY / HUD ---------- */
+function renderInventory(){
+  const wrap = document.getElementById('inv-list');
+  wrap.innerHTML = '';
+  const entries = Object.entries(state.inventory).filter(([,v])=>v>0);
+  if(entries.length===0){ wrap.innerHTML = '<small>Empty — go harvest something!</small>'; }
+  entries.forEach(([item,qty])=>{
+    const chip = document.createElement('div'); chip.className='inv-chip';
+    chip.textContent = `${ITEM_ICON[item]||'📦'} ${item} × ${qty}`;
+    wrap.appendChild(chip);
+  });
+}
+function renderHud(){
+  document.getElementById('coins').textContent = state.coins;
+  document.getElementById('storeUsed').textContent = invTotal();
+  document.getElementById('storeCap').textContent = state.storageCap;
+  document.getElementById('lvl').textContent = state.level;
+  const need = xpNeeded(state.level);
+  document.getElementById('xp-text').textContent = state.xp + ' / ' + need + ' XP';
+  document.getElementById('xp-bar').style.width = Math.min(100, state.xp/need*100) + '%';
+}
+
+/* ---------- RENDER ALL ---------- */
+function renderAll(){
+  renderHud(); renderFarm(); renderSeedBar(); renderBuildings(); renderShop(); renderOrders(); renderInventory();
+}
+
+/* ---------- TABS ---------- */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+document.getElementById('save-btn').onclick = save;
+document.getElementById('reset-btn').onclick = resetGame;
+
+/* ---------- INIT & LOOP ---------- */
+load();
+renderAll();
+setInterval(()=>{ renderFarm(); renderBuildings(); }, 1000);
+setInterval(save, 15000);
+window.addEventListener('beforeunload', save);
+</script>
+</body>
+</html>
